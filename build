@@ -1,0 +1,48 @@
+#!/bin/bash
+
+program=cdrtools
+version=v3.02a09-pled-1.0.1-linux
+arch=$(uname -m)
+release=$program-$version-$arch
+
+# When this script exits, automatically delete the temp directory.
+cleanup() 
+{ 
+    if [[ -e "$tmp" ]]; then
+        echo "Clearing temp files..."  
+        rm -r "$tmp"   
+    fi
+}
+trap cleanup EXIT
+
+# Print out any uncaught errors.
+err() 
+{	
+    echo -e "\nUncaught error in $0, line number: $BASH_LINENO" >&2
+}
+trap err ERR
+
+# Put temp directory in /tmp (or whatever the OS prefers)
+tmp=$(mktemp -d --tmpdir cdib.XXX)
+
+set -e
+cd "$(dirname "$0")"
+rm -rf build-tmp $release $release.zip
+
+# Just clean built binaries/releases from source and exit now if given the argument 'clean'.
+if [ "$1" == "clean" ]; then
+    exit 0
+fi
+
+mkdir -p $release/licenses
+
+cp -r $program $tmp
+
+make -C $tmp/cdrtools
+pled/pled $tmp/cdrtools/cdrecord/OBJ/*/cdrecord $release/
+pled/pled $tmp/cdrtools/mkisofs/OBJ/*/mkisofs $release/
+
+cp -r readme.md $program/GPL-2.0.txt $program/CDDL.Schily.txt $program/COPYING $release/licenses
+
+chmod -R 777 $release
+zip -rq $release.zip $release
